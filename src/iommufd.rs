@@ -22,6 +22,8 @@ pub struct IommufdDev {
     pub path: PathBuf,
     /// PCI vendor ID (e.g. `0x10de` for NVIDIA).
     pub vendor: u16,
+    /// PCI device ID (e.g. `0x2330` for an H100 SXM5 80GB).
+    pub device: u16,
     /// Full 24-bit PCI class code (class byte | subclass byte | prog-if byte).
     pub class: u32,
 }
@@ -33,6 +35,13 @@ impl IommufdDev {
     /// programming interface, not device kind.
     pub fn class_prefix(&self) -> u16 {
         (self.class >> 8) as u16
+    }
+
+    /// The device's name in the PCI ID database (compile-time `pci-ids`
+    /// crate), e.g. "GH100 [H100 SXM5 80GB]" for 10de:2330.  None if the
+    /// database does not know the (vendor, device) pair.
+    pub fn device_name(&self) -> Option<&'static str> {
+        pci_ids::Device::from_vid_pid(self.vendor, self.device).map(|d| d.name())
     }
 }
 
@@ -58,12 +67,15 @@ pub fn enumerate_iommufd(vfio_dir: &Path, sysfs_dir: &Path) -> Vec<IommufdDev> {
             let read = |f: &str| std::fs::read_to_string(device.join(f)).unwrap_or_default();
             let vendor =
                 u16::from_str_radix(read("vendor").trim().trim_start_matches("0x"), 16).ok()?;
+            let dev_id =
+                u16::from_str_radix(read("device").trim().trim_start_matches("0x"), 16).ok()?;
             let class =
                 u32::from_str_radix(read("class").trim().trim_start_matches("0x"), 16).ok()?;
             Some(IommufdDev {
                 num,
                 path: devices_dir.join(format!("vfio{num}")),
                 vendor,
+                device: dev_id,
                 class,
             })
         })
@@ -75,7 +87,7 @@ pub fn enumerate_iommufd(vfio_dir: &Path, sysfs_dir: &Path) -> Vec<IommufdDev> {
 /// Fake IOMMUFD node layout for tests, mirroring what `enumerate_iommufd`
 /// reads, under one root:
 ///   `<root>/devices/vfio<n>`                       — the cdev entry
-///   `<root>/sysfs/vfio<n>/device/{vendor,class}`   — fake sysfs
+///   `<root>/sysfs/vfio<n>/device/{vendor,device,class}`   — fake sysfs
 ///
 /// Enable with the `testfs` feature (dev-dependencies only — this writes
 /// fake sysfs trees and belongs nowhere near production code).
@@ -88,16 +100,18 @@ pub mod testfs {
         root.join("sysfs")
     }
 
-    /// Add one fake cdev `vfio<n>` with the given sysfs `vendor` and `class`
-    /// contents (as sysfs prints them, e.g. "0x10de", "0x030200").
-    pub fn add(root: &Path, n: u32, vendor: &str, class: &str) {
+    /// Add one fake cdev `vfio<n>` with the given sysfs `vendor`, `device`,
+    /// and `class` contents (as sysfs prints them, e.g. "0x10de", "0x2330",
+    /// "0x030200").
+    pub fn add(root: &Path, n: u32, vendor: &str, device: &str, class: &str) {
         let devices = root.join("devices");
         std::fs::create_dir_all(&devices).unwrap();
         std::fs::write(devices.join(format!("vfio{n}")), b"").unwrap();
-        let device = sysfs(root).join(format!("vfio{n}")).join("device");
-        std::fs::create_dir_all(&device).unwrap();
-        std::fs::write(device.join("vendor"), format!("{vendor}\n")).unwrap();
-        std::fs::write(device.join("class"), format!("{class}\n")).unwrap();
+        let dev_dir = sysfs(root).join(format!("vfio{n}")).join("device");
+        std::fs::create_dir_all(&dev_dir).unwrap();
+        std::fs::write(dev_dir.join("vendor"), format!("{vendor}\n")).unwrap();
+        std::fs::write(dev_dir.join("device"), format!("{device}\n")).unwrap();
+        std::fs::write(dev_dir.join("class"), format!("{class}\n")).unwrap();
     }
 }
 
@@ -111,9 +125,9 @@ mod tests {
     #[test]
     fn enumerates_and_sorts_by_num() {
         let root = TempDir::new().unwrap();
-        add(root.path(), 42, "0x10de", "0x030200");
-        add(root.path(), 7, "0x10de", "0x068000");
-        add(root.path(), 3, "0x15b3", "0x020000");
+        add(root.path(), 42, "0x10de", "0x2330", "0x030200");
+        add(root.path(), 7, "0x10de", "0x22a3", "0x068000");
+        add(root.path(), 3, "0x15b3", "0x101e", "0x020000");
 
         let sysfs = root.path().join("sysfs");
         let devs = enumerate_iommufd(root.path(), &sysfs);
@@ -122,8 +136,22 @@ mod tests {
             vec![3, 7, 42]
         );
         assert_eq!(devs[1].vendor, 0x10de);
+        assert_eq!(devs[1].device, 0x22a3);
         assert_eq!(devs[1].class, 0x068000);
         assert!(devs[2].path.ends_with("devices/vfio42"));
+    }
+
+    #[test]
+    fn device_name_resolves_from_pci_ids() {
+        let root = TempDir::new().unwrap();
+        add(root.path(), 0, "0x10de", "0x2330", "0x030200");
+        // A device id the database cannot know.
+        add(root.path(), 1, "0x10de", "0xdead", "0x030200");
+
+        let devs = enumerate_iommufd(root.path(), &root.path().join("sysfs"));
+        let h100 = devs[0].device_name().expect("10de:2330 must be known");
+        assert!(h100.contains("GH100"), "unexpected name: {}", h100);
+        assert_eq!(devs[1].device_name(), None);
     }
 
     #[test]
