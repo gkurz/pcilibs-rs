@@ -14,7 +14,10 @@ use nix::sys::stat;
 
 #[cfg(feature = "testfs")]
 pub use iommufd::testfs;
-pub use iommufd::{enumerate_iommufd, IommufdDev, IOMMUFD_SYSFS_CLASS, IOMMUFD_VFIO_DIR};
+pub use iommufd::{
+    enumerate_iommufd, is_passthrough_capable_class, lookup_iommufd_dev, IommufdDev,
+    IOMMUFD_SYSFS_CLASS, IOMMUFD_VFIO_DIR,
+};
 pub use pci_manager::{is_pcie_device, PCIDevice, PCIDeviceManager};
 
 /// Device driver for vfio-pci guest kernel driver.
