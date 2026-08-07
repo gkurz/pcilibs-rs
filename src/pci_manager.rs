@@ -24,16 +24,16 @@ fn address_to_id(address: &str) -> u64 {
 
 #[derive(Clone, Debug, Default)]
 pub struct PCIDevice {
-    pub(crate) device_path: PathBuf,
-    pub(crate) address: String,
-    pub(crate) vendor: u16,
-    pub(crate) class: u32,
-    pub(crate) class_name: String,
-    pub(crate) device: u16,
-    pub(crate) device_name: String,
-    pub(crate) driver: String,
-    pub(crate) iommu_group: i64,
-    pub(crate) numa_node: i64,
+    pub device_path: PathBuf,
+    pub address: String,
+    pub vendor: u16,
+    pub class: u32,
+    pub class_name: String,
+    pub device: u16,
+    pub device_name: String,
+    pub driver: String,
+    pub iommu_group: i64,
+    pub numa_node: i64,
 }
 
 pub struct PCIDeviceManager {
