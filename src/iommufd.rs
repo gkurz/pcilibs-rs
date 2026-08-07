@@ -93,6 +93,10 @@ pub fn is_passthrough_capable_class(class: u32) -> bool {
 /// and does not need to scan the full `/dev/vfio/devices/` directory.
 pub fn lookup_iommufd_dev(name: &str, vfio_dir: &Path, sysfs_dir: &Path) -> Option<IommufdDev> {
     let num = name.strip_prefix("vfio")?.parse::<u32>().ok()?;
+    let path = vfio_dir.join("devices").join(name);
+    if !path.exists() {
+        return None;
+    }
     let device = sysfs_dir.join(name).join("device");
     let read = |f: &str| std::fs::read_to_string(device.join(f)).unwrap_or_default();
     let vendor = u16::from_str_radix(read("vendor").trim().trim_start_matches("0x"), 16).ok()?;
@@ -100,7 +104,7 @@ pub fn lookup_iommufd_dev(name: &str, vfio_dir: &Path, sysfs_dir: &Path) -> Opti
     let class = u32::from_str_radix(read("class").trim().trim_start_matches("0x"), 16).ok()?;
     Some(IommufdDev {
         num,
-        path: vfio_dir.join("devices").join(name),
+        path,
         vendor,
         device: dev_id,
         class,
@@ -269,6 +273,20 @@ mod tests {
         let root = TempDir::new().unwrap();
         let sysfs = root.path().join("sysfs");
         assert!(lookup_iommufd_dev("vfio99", root.path(), &sysfs).is_none());
+    }
+
+    #[test]
+    fn lookup_returns_none_when_cdev_absent_but_sysfs_present() {
+        let root = TempDir::new().unwrap();
+        let sysfs = root.path().join("sysfs");
+        // Write sysfs files without creating the cdev entry under devices/.
+        let dev_dir = sysfs.join("vfio5").join("device");
+        fs::create_dir_all(&dev_dir).unwrap();
+        fs::write(dev_dir.join("vendor"), "0x10de\n").unwrap();
+        fs::write(dev_dir.join("device"), "0x22a3\n").unwrap();
+        fs::write(dev_dir.join("class"), "0x068000\n").unwrap();
+
+        assert!(lookup_iommufd_dev("vfio5", root.path(), &sysfs).is_none());
     }
 
     #[test]
