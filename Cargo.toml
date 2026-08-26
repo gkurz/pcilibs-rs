@@ -17,7 +17,13 @@ testfs = []
 
 [dependencies]
 nix = { version = "0.31.3", default-features = false, features = ["fs"] }
-pci-ids = "0.2.6"
+phf = { version = "0.11", default-features = false }
+
+[build-dependencies]
+nom = { version = "7.1", default-features = false }
+phf_codegen = "0.11"
+quote = "1.0"
+proc-macro2 = "1.0"
 
 [dev-dependencies]
 tempfile = "3.19.1"

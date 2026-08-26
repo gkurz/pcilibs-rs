@@ -4,6 +4,7 @@
 //
 
 mod iommufd;
+mod pci_ids;
 mod pci_manager;
 
 use std::fs;

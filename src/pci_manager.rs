@@ -9,7 +9,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use pci_ids::{Classes, Vendors};
+use crate::pci_ids::{Classes, Vendors};
 
 const PCI_DEV_DOMAIN: &str = "0000";
 const PCI_CONFIG_SPACE_SZ: u64 = 256;
