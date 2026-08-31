@@ -250,6 +250,7 @@ mod tests {
         assert!(!is_passthrough_capable_class(0x060000)); // Host Bridge
         assert!(!is_passthrough_capable_class(0x060400)); // PCI-to-PCI Bridge
         assert!(!is_passthrough_capable_class(0x040300)); // Audio device
+
         // prog-if byte in class should not affect the result
         assert!(!is_passthrough_capable_class(0x060001)); // Host Bridge, non-zero prog-if
     }
