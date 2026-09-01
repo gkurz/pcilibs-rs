@@ -47,7 +47,12 @@ fn main() {
     let src_path = Path::new("pciids/pci.ids");
     let dest_path = Path::new(&out_dir).join("pci_ids.cg.rs");
     let input = {
-        let f = fs::File::open(src_path).unwrap();
+        let f = fs::File::open(src_path).unwrap_or_else(|e| {
+            panic!(
+                "failed to open {} (did you run `git submodule update --init`?): {e}",
+                src_path.display()
+            )
+        });
         BufReader::new(f)
     };
     let mut output = {
