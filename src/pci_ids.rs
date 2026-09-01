@@ -94,7 +94,7 @@ impl Device {
     }
 }
 
-/// Represents an subsystem to a PCI device in the PCI database.
+/// Represents a subsystem to a PCI device in the PCI database.
 ///
 /// Every subsystem has subvendor and subdevice ID
 /// and a pretty name.
@@ -191,7 +191,7 @@ impl Subclass {
 
     /// Returns a tuple of (class ID, subclass ID) for this subclass.
     ///
-    /// This is conveniont for interactions with other PCI libraries.
+    /// This is convenient for interactions with other PCI libraries.
     pub fn as_cid_sid(&self) -> (u8, u8) {
         (self.class_id, self.id)
     }
